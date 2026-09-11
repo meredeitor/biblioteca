@@ -423,7 +423,7 @@ function registerEvents() {
 async function initialize() {
   registerEvents();
   setConnectionState();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(error => console.warn('Service worker:', error));
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register(`./sw.js?v=${window.APP_VERSION}`).catch(error => console.warn('Service worker:', error));
   onAuthStateChanged(auth, async user => {
     const mode = localStorage.getItem('libraryMode');
     if (!user || !mode) return showAccess();
