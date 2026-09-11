@@ -1,4 +1,4 @@
 (function (scope) {
   'use strict';
-  scope.APP_VERSION = '1.1.1';
+  scope.APP_VERSION = '1.2.0';
 })(typeof self !== 'undefined' ? self : window);

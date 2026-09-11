@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword, signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
-  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
+  getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, where, onSnapshot, runTransaction, writeBatch, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -12,7 +12,7 @@ const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-const state = { user: null, isAdmin: false, books: [], unsubscribers: [], installPrompt: null };
+const state = { user: null, isAdmin: false, books: [], unsubscribers: [], installPrompt: null, loanRequestBusy: false };
 const statusLabels = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', completed: 'Concluida', active: 'Activo', returned: 'Devuelto', overdue: 'Vencido' };
 
 function escapeHtml(value = '') {
@@ -153,7 +153,7 @@ function requestCard(item, adminView = false) {
   const data = item.data;
   return `<article class="list-card">
     <div><h3>${escapeHtml(data.bookTitle || 'Libro')}</h3><p>${escapeHtml(adminView ? `${data.employeeName || ''} · ${data.employeeNumber || ''}` : data.bookAuthor || '')}</p></div>
-    <div><small>Solicitud</small><p>${formatDate(data.createdAt)}</p></div>
+    <div><small>${data.type === 'renewal' ? 'Renovación' : 'Solicitud'}</small><p>${formatDate(data.createdAt)}</p></div>
     <div><span class="status ${escapeHtml(data.status)}">${statusLabels[data.status] || data.status}</span></div>
     ${adminView && data.status === 'pending' ? `<div class="list-actions"><button class="button primary compact" data-approve-request="${item.id}">Aprobar</button><button class="button danger compact" data-reject-request="${item.id}">Rechazar</button></div>` : '<div></div>'}
   </article>`;
@@ -181,7 +181,7 @@ function loanCard(item, history = false) {
     <div><h3>${escapeHtml(data.bookTitle || 'Libro')}</h3><p>${escapeHtml(state.isAdmin ? `${data.employeeName || ''} · ${data.employeeNumber || ''}` : data.bookAuthor || '')}</p></div>
     <div><small>${history ? 'Devolución' : 'Fecha límite'}</small><p>${formatDate(history ? data.returnedAt : data.dueAt)}</p></div>
     <div><span class="status ${status}">${statusLabels[status] || status}</span></div>
-    ${state.isAdmin && data.status === 'active' ? `<div class="list-actions"><button class="button primary compact" data-return-loan="${item.id}">Registrar devolución</button></div>` : '<div></div>'}
+    ${state.isAdmin && data.status === 'active' ? `<div class="list-actions"><button class="button primary compact" data-return-loan="${item.id}">Registrar devolución</button></div>` : (!state.isAdmin && data.status === 'active' ? `<div class="list-actions"><button class="button secondary compact" data-renew-loan="${item.id}">Solicitar renovación</button></div>` : '<div></div>')}
   </article>`;
 }
 
@@ -202,11 +202,17 @@ async function requestBook(bookId, button) {
   const person = identity();
   if (!book || Number(book.availableCopies || 0) < 1) return toast('Este libro ya no tiene ejemplares disponibles.', 'error');
   if (!person.employeeName || !person.employeeNumber) return $('#identityDialog').showModal();
+  if (state.loanRequestBusy) return toast('Tu solicitud anterior todavía se está enviando.', 'error');
+  state.loanRequestBusy = true;
   setBusy(button, true, 'Enviando…');
   try {
-    const existing = await getDocs(query(collection(db, 'requests'), where('userId', '==', state.user.uid)));
-    const duplicate = existing.docs.some(item => item.data().bookId === bookId && ['pending', 'approved'].includes(item.data().status));
-    if (duplicate) throw new Error('Ya tienes una solicitud activa para este libro.');
+    const [existing, loans] = await Promise.all([
+      getDocs(query(collection(db, 'requests'), where('userId', '==', state.user.uid))),
+      getDocs(query(collection(db, 'loans'), where('userId', '==', state.user.uid)))
+    ]);
+    const pendingRequest = existing.docs.some(item => item.data().type !== 'renewal' && item.data().status === 'pending');
+    const activeLoan = loans.docs.some(item => item.data().status === 'active');
+    if (pendingRequest || activeLoan) throw new Error('Solo puedes solicitar un libro a la vez. Devuelve el préstamo actual o espera a que atiendan tu solicitud.');
     await addDoc(collection(db, 'requests'), {
       bookId, bookTitle: book.title, bookAuthor: book.author || '', userId: state.user.uid,
       employeeName: person.employeeName, employeeNumber: person.employeeNumber,
@@ -215,7 +221,32 @@ async function requestBook(bookId, button) {
     toast('Solicitud enviada. La biblioteca te avisará cuando sea aprobada.');
     location.hash = '#my-requests';
   } catch (error) { toast(error.message, 'error'); }
-  finally { setBusy(button, false); }
+  finally { state.loanRequestBusy = false; setBusy(button, false); }
+}
+
+async function requestRenewal(loanId, button) {
+  if (state.isAdmin) return;
+  const person = identity();
+  if (state.loanRequestBusy) return toast('Tu solicitud anterior todavía se está enviando.', 'error');
+  state.loanRequestBusy = true;
+  setBusy(button, true, 'Enviando…');
+  try {
+    const existing = await getDocs(query(collection(db, 'requests'), where('userId', '==', state.user.uid)));
+    const pending = existing.docs.some(item => item.data().type === 'renewal' && item.data().loanId === loanId && item.data().status === 'pending');
+    if (pending) throw new Error('La renovación de este préstamo ya está pendiente.');
+    const loans = await getDocs(query(collection(db, 'loans'), where('userId', '==', state.user.uid)));
+    const loan = loans.docs.find(item => item.id === loanId && item.data().status === 'active');
+    if (!loan) throw new Error('El préstamo ya no está activo.');
+    const data = loan.data();
+    await addDoc(collection(db, 'requests'), {
+      type: 'renewal', loanId, bookId: data.bookId, bookTitle: data.bookTitle, bookAuthor: data.bookAuthor || '',
+      userId: state.user.uid, employeeName: person.employeeName, employeeNumber: person.employeeNumber,
+      status: 'pending', createdAt: serverTimestamp()
+    });
+    toast('Renovación solicitada. La biblioteca debe aprobarla.');
+    location.hash = '#my-requests';
+  } catch (error) { toast(error.message, 'error'); }
+  finally { state.loanRequestBusy = false; setBusy(button, false); }
 }
 
 function openBookDialog(book = null) {
@@ -314,16 +345,33 @@ async function importInitialCatalog(button) {
 async function approveRequest(requestId, button) {
   setBusy(button, true, 'Aprobando…');
   try {
+    const requestCheck = await getDoc(doc(db, 'requests', requestId));
+    const requestPreview = requestCheck.data();
+    if (requestPreview?.type !== 'renewal') {
+      const userLoans = await getDocs(query(collection(db, 'loans'), where('userId', '==', requestPreview?.userId || '')));
+      if (userLoans.docs.some(item => item.data().status === 'active')) throw new Error('Este usuario ya tiene un préstamo activo.');
+    }
     await runTransaction(db, async transaction => {
       const requestRef = doc(db, 'requests', requestId);
       const requestSnap = await transaction.get(requestRef);
       if (!requestSnap.exists() || requestSnap.data().status !== 'pending') throw new Error('La solicitud ya fue atendida.');
       const requestData = requestSnap.data();
+      if (requestData.type === 'renewal') {
+        const loanRef = doc(db, 'loans', requestData.loanId);
+        const loanSnap = await transaction.get(loanRef);
+        if (!loanSnap.exists() || loanSnap.data().status !== 'active') throw new Error('El préstamo ya no está activo.');
+        const currentDue = loanSnap.data().dueAt?.toDate ? loanSnap.data().dueAt.toDate() : new Date();
+        const renewalBase = currentDue > new Date() ? currentDue : new Date();
+        renewalBase.setDate(renewalBase.getDate() + 15);
+        transaction.update(loanRef, { dueAt: Timestamp.fromDate(renewalBase), renewedAt: serverTimestamp(), renewalCount: Number(loanSnap.data().renewalCount || 0) + 1 });
+        transaction.update(requestRef, { status: 'completed', approvedAt: serverTimestamp() });
+        return;
+      }
       const bookRef = doc(db, 'books', requestData.bookId);
       const bookSnap = await transaction.get(bookRef);
       if (!bookSnap.exists() || Number(bookSnap.data().availableCopies || 0) < 1) throw new Error('No hay ejemplares disponibles.');
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 14);
+      dueDate.setDate(dueDate.getDate() + 15);
       const loanRef = doc(collection(db, 'loans'));
       transaction.update(bookRef, { availableCopies: Number(bookSnap.data().availableCopies) - 1, updatedAt: serverTimestamp() });
       transaction.update(requestRef, { status: 'approved', approvedAt: serverTimestamp(), loanId: loanRef.id });
@@ -333,7 +381,7 @@ async function approveRequest(requestId, button) {
         status: 'active', createdAt: serverTimestamp(), dueAt: Timestamp.fromDate(dueDate)
       });
     });
-    toast('Solicitud aprobada y préstamo registrado.');
+    toast(requestPreview?.type === 'renewal' ? 'Renovación aprobada por 15 días.' : 'Solicitud aprobada y préstamo registrado por 15 días.');
   } catch (error) { toast(error.message, 'error'); }
   finally { setBusy(button, false); }
 }
@@ -430,6 +478,7 @@ function registerEvents() {
     const approve = event.target.closest('[data-approve-request]');
     const reject = event.target.closest('[data-reject-request]');
     const returned = event.target.closest('[data-return-loan]');
+    const renew = event.target.closest('[data-renew-loan]');
     if (request) await requestBook(request.dataset.requestBook, request);
     if (edit) openBookDialog(state.books.find(book => book.id === edit.dataset.editBook));
     if (toggle) { const book = state.books.find(item => item.id === toggle.dataset.toggleBook); if (book) await updateDoc(doc(db, 'books', book.id), { active: book.active === false, updatedAt: serverTimestamp() }); }
@@ -437,6 +486,7 @@ function registerEvents() {
     if (approve) await approveRequest(approve.dataset.approveRequest, approve);
     if (reject) await rejectRequest(reject.dataset.rejectRequest, reject);
     if (returned) await returnLoan(returned.dataset.returnLoan, returned);
+    if (renew) await requestRenewal(renew.dataset.renewLoan, renew);
   });
   window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); state.installPrompt = event; $('#installButton').hidden = false; });
   $('#installButton').addEventListener('click', async () => { if (!state.installPrompt) return; await state.installPrompt.prompt(); state.installPrompt = null; $('#installButton').hidden = true; });

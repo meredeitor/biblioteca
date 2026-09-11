@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#145a46">
   <meta name="description" content="Catálogo y préstamos de Biblioteca STC">
   <title>Biblioteca STC</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.1.1">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.2.0">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/styles.css?v=1.1.1">
+  <link rel="stylesheet" href="./css/styles.css?v=1.2.0">
 </head>
 <body>
   <noscript>Esta aplicación necesita JavaScript para funcionar.</noscript>
@@ -118,7 +118,7 @@
       </section>
 
       <section class="page" data-page-content="requests" hidden>
-        <div class="page-heading"><div><p class="eyebrow">Atención</p><h2>Solicitudes pendientes</h2><p>Aprueba o rechaza las solicitudes recibidas.</p></div></div>
+        <div class="page-heading"><div><p class="eyebrow">Atención</p><h2>Solicitudes pendientes</h2><p>Aprueba o rechaza solicitudes de libros y renovaciones.</p></div></div>
         <div id="adminRequestsList" class="card-list"></div>
       </section>
 
@@ -130,8 +130,8 @@
       <section class="page" data-page-content="help" hidden>
         <div class="page-heading"><div><p class="eyebrow">Soporte</p><h2>Ayuda</h2><p>Información para usar la aplicación.</p></div></div>
         <div class="help-grid">
-          <article class="info-card"><h3>Cómo solicitar</h3><ol><li>Busca un libro en el catálogo.</li><li>Presiona <strong>Solicitar</strong>.</li><li>Espera la aprobación del administrador.</li><li>Recoge el ejemplar en biblioteca.</li></ol></article>
-          <article class="info-card"><h3>Estados</h3><p><span class="status pending">Pendiente</span> esperando revisión.</p><p><span class="status approved">Aprobada</span> lista para entrega.</p><p><span class="status rejected">Rechazada</span> no pudo atenderse.</p></article>
+          <article class="info-card"><h3>Cómo solicitar</h3><ol><li>Busca un libro en el catálogo.</li><li>Presiona <strong>Solicitar</strong>.</li><li>Espera la aprobación del administrador.</li><li>Recoge el ejemplar en biblioteca.</li></ol><p>Solo puedes tener una solicitud o préstamo vigente.</p></article>
+          <article class="info-card"><h3>Préstamos y renovación</h3><p>El préstamo dura 15 días.</p><p>Si necesitas más tiempo, abre <strong>Préstamos activos</strong>, solicita la renovación y espera la aprobación de la biblioteca.</p></article>
           <article class="info-card about-card"><h3>Acerca de</h3><div class="about-logo">📚</div><strong>Biblioteca STC</strong><p>PWA para consulta, inventario y préstamo de libros.</p><span class="version-badge">Versión <span data-app-version></span></span><small>HTML, CSS, JavaScript y Firebase</small></article>
         </div>
       </section>
@@ -158,7 +158,7 @@
   </dialog>
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
-  <script src="./js/version.js?v=1.1.1"></script>
-  <script type="module" src="./js/app.js?v=1.1.1"></script>
+  <script src="./js/version.js?v=1.2.0"></script>
+  <script type="module" src="./js/app.js?v=1.2.0"></script>
 </body>
 </html>
