@@ -19,9 +19,14 @@ def safe_code(value):
     return re.sub(r"[^a-z0-9_-]+", "-", clean(value).lower()).strip("-")
 
 
-def image_position(image):
+def image_position(sheet, image):
     anchor = image.anchor._from
-    return anchor.row, anchor.rowOff, anchor.col, anchor.colOff
+    default_height = sheet.sheet_format.defaultRowHeight or 15
+    rows_height = sum(
+        (sheet.row_dimensions[row].height or default_height) * 12700
+        for row in range(1, anchor.row + 1)
+    )
+    return rows_height + anchor.rowOff, anchor.col, anchor.colOff
 
 
 source = Path(sys.argv[1])
@@ -34,7 +39,7 @@ data_root.mkdir(parents=True, exist_ok=True)
 workbook = load_workbook(source, read_only=False, data_only=True)
 sheet = workbook.active
 book_rows = [row for row in range(11, sheet.max_row + 1) if clean(sheet.cell(row, 1).value)]
-images = sorted(sheet._images, key=image_position)
+images = sorted(sheet._images, key=lambda image: image_position(sheet, image))
 
 if len(book_rows) != len(images):
     raise RuntimeError(f"Se encontraron {len(book_rows)} libros y {len(images)} portadas; no es seguro relacionarlos.")
