@@ -22,6 +22,16 @@ La aplicación no permite registrar cuentas desde el navegador. Las reglas recon
 
 Las imágenes pueden publicarse en `assets/portadas/` y registrarse como `./assets/portadas/archivo.jpg`, o utilizar una URL HTTPS pública. No se suben archivos a Firebase.
 
+## Importar el catálogo inicial
+
+La versión 1.1.0 incluye el catálogo preparado desde `Biblioteca_EL_PUEBLITO_portadas_mejoradas.xlsx` y 141 portadas dentro del repositorio.
+
+1. Entra a la aplicación como administrador.
+2. Abre **Administrar libros**.
+3. Presiona **Importar catálogo inicial**.
+
+La importación usa el código del libro como ID del documento. Los libros ya existentes se omiten y no se duplican. Los estados `OCUPADO` y `NO ESTA EN BIBLIOTECA` se importan sin disponibilidad; los demás registros se consideran disponibles.
+
 ## Probar localmente
 
 Los módulos de Firebase y el service worker requieren HTTP; no abras `index.html` directamente como archivo. Desde esta carpeta puedes usar cualquier servidor estático, por ejemplo:
@@ -41,7 +51,7 @@ En Firebase Console agrega el dominio de GitHub Pages (`usuario.github.io`) en *
 La versión se define una sola vez en `js/version.js`:
 
 ```js
-scope.APP_VERSION = '1.0.1';
+scope.APP_VERSION = '1.1.0';
 ```
 
 Al publicar cambios incrementa ese valor. El badge de Inicio, **Ayuda > Acerca de** y el nombre de caché del service worker tomarán automáticamente la nueva versión. Al activarse, el service worker elimina las cachés anteriores.

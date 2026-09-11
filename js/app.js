@@ -5,7 +5,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
   getFirestore, collection, doc, getDocs, addDoc, updateDoc,
-  query, where, onSnapshot, runTransaction, serverTimestamp, Timestamp
+  query, where, onSnapshot, runTransaction, writeBatch, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
 const auth = getAuth(firebaseApp);
@@ -263,6 +263,34 @@ async function saveBook(form, button) {
   finally { setBusy(button, false); }
 }
 
+async function importInitialCatalog(button) {
+  if (!state.isAdmin) return;
+  setBusy(button, true, 'Importando…');
+  try {
+    const response = await fetch('./data/books-import.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('No se encontró el archivo del catálogo inicial.');
+    const source = await response.json();
+    const existingSnapshot = await getDocs(collection(db, 'books'));
+    const existingIds = new Set(existingSnapshot.docs.map(item => item.id));
+    const pending = source.books.filter(book => !existingIds.has(book.id));
+    let inserted = 0;
+
+    for (let start = 0; start < pending.length; start += 400) {
+      const batch = writeBatch(db);
+      pending.slice(start, start + 400).forEach(book => {
+        const { id, ...data } = book;
+        batch.set(doc(db, 'books', id), { ...data, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+      inserted += Math.min(400, pending.length - start);
+    }
+
+    const skipped = source.books.length - inserted;
+    toast(`Importación terminada: ${inserted} libros agregados${skipped ? ` y ${skipped} existentes omitidos` : ''}.`);
+  } catch (error) { toast(`No se pudo importar: ${error.message}`, 'error'); }
+  finally { setBusy(button, false); }
+}
+
 async function approveRequest(requestId, button) {
   setBusy(button, true, 'Aprobando…');
   try {
@@ -372,6 +400,7 @@ function registerEvents() {
   $('#bookSearch').addEventListener('input', renderBooks);
   $('#categoryFilter').addEventListener('change', renderBooks);
   $('#newBookButton').addEventListener('click', () => openBookDialog());
+  $('#importBooksButton').addEventListener('click', event => importInitialCatalog(event.currentTarget));
   $('#bookForm').addEventListener('submit', event => { event.preventDefault(); saveBook(event.currentTarget, $('button[type="submit"]', event.currentTarget)); });
   document.addEventListener('click', async event => {
     const request = event.target.closest('[data-request-book]');
