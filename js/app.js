@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword, signOut
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
 import {
-  getFirestore, collection, doc, getDocs, addDoc, updateDoc,
+  getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, where, onSnapshot, runTransaction, writeBatch, serverTimestamp, Timestamp
 } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
 
@@ -135,7 +135,7 @@ function renderManageBooks() {
   $('#manageBooksList').innerHTML = state.books.length ? state.books.map(book => `<article class="admin-book">
     ${bookCover(book, 'admin-thumb')}
     <div><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author)} · ${Number(book.availableCopies || 0)} de ${Number(book.totalCopies || 0)} disponibles</p>
-      <div class="admin-actions"><button class="button secondary compact" data-edit-book="${book.id}">Editar</button><button class="button ${book.active === false ? 'secondary' : 'danger'} compact" data-toggle-book="${book.id}">${book.active === false ? 'Activar' : 'Ocultar'}</button></div>
+      <div class="admin-actions" style="flex-wrap:wrap"><button class="button secondary compact" data-edit-book="${book.id}">Editar</button><button class="button ${book.active === false ? 'secondary' : 'danger'} compact" data-toggle-book="${book.id}">${book.active === false ? 'Activar' : 'Ocultar'}</button><button class="button danger compact" data-delete-book="${book.id}">Eliminar</button></div>
     </div>
   </article>`).join('') : '<div class="empty-state">Aún no hay libros. Agrega el primero.</div>';
 }
@@ -259,6 +259,26 @@ async function saveBook(form, button) {
     }
     $('#bookDialog').close();
     toast('Libro guardado correctamente.');
+  } catch (error) { toast(error.message, 'error'); }
+  finally { setBusy(button, false); }
+}
+
+async function deleteBook(bookId, button) {
+  const book = state.books.find(item => item.id === bookId);
+  if (!book || !state.isAdmin) return;
+  if (!window.confirm(`¿Eliminar definitivamente "${book.title}"? Esta acción no se puede deshacer.`)) return;
+
+  setBusy(button, true, 'Eliminando…');
+  try {
+    const [requestsSnapshot, loansSnapshot] = await Promise.all([
+      getDocs(query(collection(db, 'requests'), where('bookId', '==', bookId))),
+      getDocs(query(collection(db, 'loans'), where('bookId', '==', bookId)))
+    ]);
+    if (!requestsSnapshot.empty || !loansSnapshot.empty) {
+      throw new Error('Este libro tiene solicitudes o préstamos registrados. Usa Ocultar para conservar el historial.');
+    }
+    await deleteDoc(doc(db, 'books', bookId));
+    toast('Libro eliminado correctamente.');
   } catch (error) { toast(error.message, 'error'); }
   finally { setBusy(button, false); }
 }
@@ -406,12 +426,14 @@ function registerEvents() {
     const request = event.target.closest('[data-request-book]');
     const edit = event.target.closest('[data-edit-book]');
     const toggle = event.target.closest('[data-toggle-book]');
+    const remove = event.target.closest('[data-delete-book]');
     const approve = event.target.closest('[data-approve-request]');
     const reject = event.target.closest('[data-reject-request]');
     const returned = event.target.closest('[data-return-loan]');
     if (request) await requestBook(request.dataset.requestBook, request);
     if (edit) openBookDialog(state.books.find(book => book.id === edit.dataset.editBook));
     if (toggle) { const book = state.books.find(item => item.id === toggle.dataset.toggleBook); if (book) await updateDoc(doc(db, 'books', book.id), { active: book.active === false, updatedAt: serverTimestamp() }); }
+    if (remove) await deleteBook(remove.dataset.deleteBook, remove);
     if (approve) await approveRequest(approve.dataset.approveRequest, approve);
     if (reject) await rejectRequest(reject.dataset.rejectRequest, reject);
     if (returned) await returnLoan(returned.dataset.returnLoan, returned);
