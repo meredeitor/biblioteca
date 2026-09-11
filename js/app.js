@@ -87,6 +87,7 @@ function showApp(user, isAdmin) {
   $('#loansLabel').textContent = isAdmin ? 'Préstamos activos' : 'Mis préstamos';
   $('#loansTitle').textContent = isAdmin ? 'Préstamos activos' : 'Mis préstamos';
   $$('[data-admin]').forEach(element => { element.hidden = !isAdmin; });
+  $$('[data-user-only]').forEach(element => { element.hidden = isAdmin; });
   $('#accessView').hidden = true;
   $('#appView').hidden = false;
   subscribeBooks();
@@ -417,6 +418,7 @@ function route() {
   let page = location.hash.replace('#', '') || 'catalog';
   const adminOnly = ['manage', 'requests', 'history'];
   if (!state.isAdmin && adminOnly.includes(page)) page = 'catalog';
+  if (state.isAdmin && page === 'my-requests') page = 'requests';
   $$('[data-page-content]').forEach(section => { section.hidden = section.dataset.pageContent !== page; });
   $$('[data-page]').forEach(link => link.classList.toggle('active', link.dataset.page === page));
   $('#sidebar').classList.remove('open');

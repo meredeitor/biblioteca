@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#145a46">
   <meta name="description" content="Catálogo y préstamos de Biblioteca STC">
   <title>Biblioteca STC</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.2.0">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.2.1">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/styles.css?v=1.2.0">
+  <link rel="stylesheet" href="./css/styles.css?v=1.2.1">
 </head>
 <body>
   <noscript>Esta aplicación necesita JavaScript para funcionar.</noscript>
@@ -78,7 +78,7 @@
       </div>
       <nav>
         <a href="#catalog" data-page="catalog">⌕ <span>Catálogo</span></a>
-        <a href="#my-requests" data-page="my-requests">☝ <span>Mis solicitudes</span></a>
+        <a href="#my-requests" data-page="my-requests" data-user-only>☝ <span>Mis solicitudes</span></a>
         <a href="#loans" data-page="loans">⇄ <span id="loansLabel">Mis préstamos</span></a>
         <a href="#manage" data-page="manage" data-admin hidden>▦ <span>Administrar libros</span></a>
         <a href="#requests" data-page="requests" data-admin hidden>✓ <span>Atender solicitudes</span></a>
@@ -102,7 +102,7 @@
         <div id="bookGrid" class="book-grid" aria-live="polite"></div>
       </section>
 
-      <section class="page" data-page-content="my-requests" hidden>
+      <section class="page" data-page-content="my-requests" data-user-only hidden>
         <div class="page-heading"><div><p class="eyebrow">Seguimiento</p><h2>Mis solicitudes</h2><p>Consulta el estado de los libros que solicitaste.</p></div></div>
         <div id="myRequestsList" class="card-list"></div>
       </section>
@@ -158,7 +158,7 @@
   </dialog>
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
-  <script src="./js/version.js?v=1.2.0"></script>
-  <script type="module" src="./js/app.js?v=1.2.0"></script>
+  <script src="./js/version.js?v=1.2.1"></script>
+  <script type="module" src="./js/app.js?v=1.2.1"></script>
 </body>
 </html>

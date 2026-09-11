@@ -24,7 +24,7 @@ Las imágenes pueden publicarse en `assets/portadas/` y registrarse como `./asse
 
 ## Importar el catálogo inicial
 
-La versión 1.2.0 incluye el catálogo inicial, eliminación protegida, un solo libro vigente por usuario, préstamos de 15 días y solicitudes de renovación.
+La versión 1.2.1 incluye el catálogo inicial, eliminación protegida, un solo libro vigente por usuario, préstamos de 15 días, solicitudes de renovación y navegación separada por rol.
 
 1. Entra a la aplicación como administrador.
 2. Abre **Administrar libros**.
@@ -51,7 +51,7 @@ En Firebase Console agrega el dominio de GitHub Pages (`usuario.github.io`) en *
 La versión se define una sola vez en `js/version.js`:
 
 ```js
-scope.APP_VERSION = '1.2.0';
+scope.APP_VERSION = '1.2.1';
 ```
 
 Al publicar cambios incrementa ese valor. El badge de Inicio, **Ayuda > Acerca de** y el nombre de caché del service worker tomarán automáticamente la nueva versión. Al activarse, el service worker elimina las cachés anteriores.
