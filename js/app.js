@@ -127,6 +127,7 @@ function renderBooks() {
         <h3>${escapeHtml(book.title || 'Sin título')}</h3>
         <div class="book-author">${escapeHtml(book.author || 'Autor no registrado')}</div>
         <p class="book-review">${escapeHtml(book.review || 'Sin reseña disponible.')}</p>
+        ${book.review ? `<button class="button secondary compact" type="button" data-review-book="${book.id}">Ver reseña completa</button>` : ''}
         <div class="book-footer">
           <span class="availability ${available < 1 ? 'none' : ''}">${available} disponibles</span>
           ${state.isAdmin ? '' : `<button class="button primary compact" data-request-book="${book.id}" ${available < 1 ? 'disabled' : ''}>Solicitar</button>`}
@@ -286,6 +287,15 @@ function openBookDialog(book = null) {
   form.active.checked = book?.active !== false;
   $('#bookDialogTitle').textContent = book ? 'Editar libro' : 'Agregar libro';
   $('#bookDialog').showModal();
+}
+
+function openReviewDialog(bookId) {
+  const book = state.books.find(item => item.id === bookId);
+  if (!book) return;
+  $('#reviewDialogTitle').textContent = book.title || 'Libro';
+  $('#reviewDialogAuthor').textContent = book.author || 'Autor no registrado';
+  $('#reviewDialogText').textContent = book.review || 'Sin reseña disponible.';
+  $('#reviewDialog').showModal();
 }
 
 async function saveBook(form, button) {
@@ -497,6 +507,7 @@ function registerEvents() {
   $('#bookForm').addEventListener('submit', event => { event.preventDefault(); saveBook(event.currentTarget, $('button[type="submit"]', event.currentTarget)); });
   document.addEventListener('click', async event => {
     const request = event.target.closest('[data-request-book]');
+    const review = event.target.closest('[data-review-book]');
     const edit = event.target.closest('[data-edit-book]');
     const toggle = event.target.closest('[data-toggle-book]');
     const remove = event.target.closest('[data-delete-book]');
@@ -505,6 +516,7 @@ function registerEvents() {
     const returned = event.target.closest('[data-return-loan]');
     const renew = event.target.closest('[data-renew-loan]');
     if (request) await requestBook(request.dataset.requestBook, request);
+    if (review) openReviewDialog(review.dataset.reviewBook);
     if (edit) openBookDialog(state.books.find(book => book.id === edit.dataset.editBook));
     if (toggle) { const book = state.books.find(item => item.id === toggle.dataset.toggleBook); if (book) await updateDoc(doc(db, 'books', book.id), { active: book.active === false, updatedAt: serverTimestamp() }); }
     if (remove) await deleteBook(remove.dataset.deleteBook, remove);
