@@ -24,7 +24,7 @@ Las imágenes pueden publicarse en `assets/portadas/` y registrarse como `./asse
 
 ## Importar el catálogo inicial
 
-La versión 1.2.2 corrige la asignación de las 141 portadas usando su posición vertical real dentro del catálogo de Excel.
+La versión 1.3.0 agrega teléfono obligatorio para usuarios y filtro administrativo de préstamos vigentes o vencidos.
 
 1. Entra a la aplicación como administrador.
 2. Abre **Administrar libros**.
@@ -51,7 +51,7 @@ En Firebase Console agrega el dominio de GitHub Pages (`usuario.github.io`) en *
 La versión se define una sola vez en `js/version.js`:
 
 ```js
-scope.APP_VERSION = '1.2.2';
+scope.APP_VERSION = '1.3.0';
 ```
 
 Al publicar cambios incrementa ese valor. El badge de Inicio, **Ayuda > Acerca de** y el nombre de caché del service worker tomarán automáticamente la nueva versión. Al activarse, el service worker elimina las cachés anteriores.

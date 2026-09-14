@@ -12,7 +12,7 @@ const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-const state = { user: null, isAdmin: false, books: [], unsubscribers: [], installPrompt: null, loanRequestBusy: false };
+const state = { user: null, isAdmin: false, books: [], activeLoans: [], unsubscribers: [], installPrompt: null, loanRequestBusy: false };
 const statusLabels = { pending: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada', completed: 'Concluida', active: 'Activo', returned: 'Devuelto', overdue: 'Vencido' };
 
 function escapeHtml(value = '') {
@@ -46,6 +46,15 @@ function setBusy(button, busy, label) {
 function identity() {
   try { return JSON.parse(localStorage.getItem('libraryIdentity') || '{}'); }
   catch { return {}; }
+}
+
+function openIdentityDialog() {
+  const person = identity();
+  const form = $('#identityForm');
+  form.employeeNumber.value = person.employeeNumber || '';
+  form.employeeName.value = person.employeeName || '';
+  form.phone.value = person.phone || '';
+  if (!$('#identityDialog').open) $('#identityDialog').showModal();
 }
 
 function formatDate(value) {
@@ -94,6 +103,7 @@ function showApp(user, isAdmin) {
   subscribeRequests();
   subscribeLoans();
   route();
+  if (!isAdmin && (!person.employeeName || !person.employeeNumber || !person.phone)) openIdentityDialog();
 }
 
 function bookCover(book, className = 'cover') {
@@ -179,11 +189,22 @@ function loanCard(item, history = false) {
   const overdue = data.status === 'active' && due && due < new Date();
   const status = overdue ? 'overdue' : data.status;
   return `<article class="list-card">
-    <div><h3>${escapeHtml(data.bookTitle || 'Libro')}</h3><p>${escapeHtml(state.isAdmin ? `${data.employeeName || ''} · ${data.employeeNumber || ''}` : data.bookAuthor || '')}</p></div>
+    <div><h3>${escapeHtml(data.bookTitle || 'Libro')}</h3><p>${escapeHtml(state.isAdmin ? `${data.employeeName || ''} · ${data.employeeNumber || ''}` : data.bookAuthor || '')}</p>${state.isAdmin && data.phone ? `<p><a href="tel:${escapeHtml(String(data.phone).replace(/[^+\d]/g, ''))}">${escapeHtml(data.phone)}</a></p>` : ''}</div>
     <div><small>${history ? 'Devolución' : 'Fecha límite'}</small><p>${formatDate(history ? data.returnedAt : data.dueAt)}</p></div>
     <div><span class="status ${status}">${statusLabels[status] || status}</span></div>
     ${state.isAdmin && data.status === 'active' ? `<div class="list-actions"><button class="button primary compact" data-return-loan="${item.id}">Registrar devolución</button></div>` : (!state.isAdmin && data.status === 'active' ? `<div class="list-actions"><button class="button secondary compact" data-renew-loan="${item.id}">Solicitar renovación</button></div>` : '<div></div>')}
   </article>`;
+}
+
+function renderActiveLoans() {
+  let items = state.activeLoans;
+  if (state.isAdmin) {
+    const filter = $('#loanFilter').value;
+    const now = new Date();
+    if (filter === 'overdue') items = items.filter(item => item.data.dueAt?.toDate && item.data.dueAt.toDate() < now);
+    if (filter === 'current') items = items.filter(item => !item.data.dueAt?.toDate || item.data.dueAt.toDate() >= now);
+  }
+  $('#loansList').innerHTML = items.length ? items.map(item => loanCard(item)).join('') : '<div class="empty-state">No hay préstamos con este filtro.</div>';
 }
 
 function subscribeLoans() {
@@ -192,7 +213,8 @@ function subscribeLoans() {
     const items = snapshot.docs.map(item => ({ id: item.id, data: item.data() })).sort((a, b) => (b.data.createdAt?.seconds || 0) - (a.data.createdAt?.seconds || 0));
     const active = items.filter(item => item.data.status === 'active');
     const returned = items.filter(item => item.data.status === 'returned');
-    $('#loansList').innerHTML = active.length ? active.map(item => loanCard(item)).join('') : '<div class="empty-state">No hay préstamos activos.</div>';
+    state.activeLoans = active;
+    renderActiveLoans();
     if (state.isAdmin) $('#historyList').innerHTML = returned.length ? returned.map(item => loanCard(item, true)).join('') : '<div class="empty-state">Aún no hay préstamos concluidos.</div>';
   }, error => toast(`No se pudieron cargar los préstamos: ${error.message}`, 'error'));
   state.unsubscribers.push(unsubscribe);
@@ -202,7 +224,7 @@ async function requestBook(bookId, button) {
   const book = state.books.find(item => item.id === bookId);
   const person = identity();
   if (!book || Number(book.availableCopies || 0) < 1) return toast('Este libro ya no tiene ejemplares disponibles.', 'error');
-  if (!person.employeeName || !person.employeeNumber) return $('#identityDialog').showModal();
+  if (!person.employeeName || !person.employeeNumber || !person.phone) return openIdentityDialog();
   if (state.loanRequestBusy) return toast('Tu solicitud anterior todavía se está enviando.', 'error');
   state.loanRequestBusy = true;
   setBusy(button, true, 'Enviando…');
@@ -216,7 +238,7 @@ async function requestBook(bookId, button) {
     if (pendingRequest || activeLoan) throw new Error('Solo puedes solicitar un libro a la vez. Devuelve el préstamo actual o espera a que atiendan tu solicitud.');
     await addDoc(collection(db, 'requests'), {
       bookId, bookTitle: book.title, bookAuthor: book.author || '', userId: state.user.uid,
-      employeeName: person.employeeName, employeeNumber: person.employeeNumber,
+      employeeName: person.employeeName, employeeNumber: person.employeeNumber, phone: person.phone,
       status: 'pending', createdAt: serverTimestamp()
     });
     toast('Solicitud enviada. La biblioteca te avisará cuando sea aprobada.');
@@ -241,7 +263,7 @@ async function requestRenewal(loanId, button) {
     const data = loan.data();
     await addDoc(collection(db, 'requests'), {
       type: 'renewal', loanId, bookId: data.bookId, bookTitle: data.bookTitle, bookAuthor: data.bookAuthor || '',
-      userId: state.user.uid, employeeName: person.employeeName, employeeNumber: person.employeeNumber,
+      userId: state.user.uid, employeeName: person.employeeName, employeeNumber: person.employeeNumber, phone: person.phone,
       status: 'pending', createdAt: serverTimestamp()
     });
     toast('Renovación solicitada. La biblioteca debe aprobarla.');
@@ -378,7 +400,7 @@ async function approveRequest(requestId, button) {
       transaction.update(requestRef, { status: 'approved', approvedAt: serverTimestamp(), loanId: loanRef.id });
       transaction.set(loanRef, {
         requestId, bookId: requestData.bookId, bookTitle: requestData.bookTitle, bookAuthor: requestData.bookAuthor || '',
-        userId: requestData.userId, employeeName: requestData.employeeName, employeeNumber: requestData.employeeNumber,
+        userId: requestData.userId, employeeName: requestData.employeeName, employeeNumber: requestData.employeeNumber, phone: requestData.phone || '',
         status: 'active', createdAt: serverTimestamp(), dueAt: Timestamp.fromDate(dueDate)
       });
     });
@@ -429,7 +451,7 @@ function registerEvents() {
   $$('[data-app-version]').forEach(element => { element.textContent = window.APP_VERSION; });
   $('#userAccess').addEventListener('click', async () => {
     const person = identity();
-    if (!person.employeeName || !person.employeeNumber) return $('#identityDialog').showModal();
+    if (!person.employeeName || !person.employeeNumber || !person.phone) return openIdentityDialog();
     try {
       localStorage.setItem('libraryMode', 'user');
       if (!auth.currentUser?.isAnonymous) { if (auth.currentUser) await signOut(auth); await signInAnonymously(auth); }
@@ -441,7 +463,7 @@ function registerEvents() {
   $('#identityForm').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    localStorage.setItem('libraryIdentity', JSON.stringify({ employeeNumber: form.employeeNumber.value.trim(), employeeName: form.employeeName.value.trim() }));
+    localStorage.setItem('libraryIdentity', JSON.stringify({ employeeNumber: form.employeeNumber.value.trim(), employeeName: form.employeeName.value.trim(), phone: form.phone.value.trim() }));
     localStorage.setItem('libraryMode', 'user');
     try { if (auth.currentUser && !auth.currentUser.isAnonymous) await signOut(auth); if (!auth.currentUser) await signInAnonymously(auth); form.closest('dialog').close(); showApp(auth.currentUser, false); }
     catch (error) { toast(error.message, 'error'); }
@@ -469,6 +491,7 @@ function registerEvents() {
   window.addEventListener('offline', setConnectionState);
   $('#bookSearch').addEventListener('input', renderBooks);
   $('#categoryFilter').addEventListener('change', renderBooks);
+  $('#loanFilter').addEventListener('change', renderActiveLoans);
   $('#newBookButton').addEventListener('click', () => openBookDialog());
   $('#importBooksButton').addEventListener('click', event => importInitialCatalog(event.currentTarget));
   $('#bookForm').addEventListener('submit', event => { event.preventDefault(); saveBook(event.currentTarget, $('button[type="submit"]', event.currentTarget)); });

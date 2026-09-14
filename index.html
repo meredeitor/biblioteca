@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#145a46">
   <meta name="description" content="Catálogo y préstamos de Biblioteca STC">
   <title>Biblioteca STC</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=1.2.2">
+  <link rel="manifest" href="./manifest.webmanifest?v=1.3.0">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./css/styles.css?v=1.2.2">
+  <link rel="stylesheet" href="./css/styles.css?v=1.3.0">
 </head>
 <body>
   <noscript>Esta aplicación necesita JavaScript para funcionar.</noscript>
@@ -38,6 +38,9 @@
       </label>
       <label>Nombre completo
         <input name="employeeName" autocomplete="name" maxlength="100" required>
+      </label>
+      <label>Teléfono
+        <input name="phone" type="tel" autocomplete="tel" maxlength="20" required inputmode="tel" placeholder="Ej. 662 123 4567">
       </label>
       <button class="button primary" type="submit">Continuar al catálogo</button>
     </form>
@@ -108,7 +111,7 @@
       </section>
 
       <section class="page" data-page-content="loans" hidden>
-        <div class="page-heading"><div><p class="eyebrow">En circulación</p><h2 id="loansTitle">Mis préstamos</h2><p>Consulta fechas de entrega y devolución.</p></div></div>
+        <div class="page-heading"><div><p class="eyebrow">En circulación</p><h2 id="loansTitle">Mis préstamos</h2><p>Consulta fechas de entrega y devolución.</p></div><div data-admin hidden><label for="loanFilter">Mostrar</label><select id="loanFilter" style="min-height:44px;padding:0 14px;border:1px solid #cbd8d2;border-radius:12px;background:#fff"><option value="all">Todos</option><option value="current">Vigentes</option><option value="overdue">Vencidos</option></select></div></div>
         <div id="loansList" class="card-list"></div>
       </section>
 
@@ -158,7 +161,7 @@
   </dialog>
 
   <div id="toastRegion" class="toast-region" aria-live="polite"></div>
-  <script src="./js/version.js?v=1.2.2"></script>
-  <script type="module" src="./js/app.js?v=1.2.2"></script>
+  <script src="./js/version.js?v=1.3.0"></script>
+  <script type="module" src="./js/app.js?v=1.3.0"></script>
 </body>
 </html>
